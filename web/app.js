@@ -19,7 +19,7 @@ class DiscourseHooksViewer {
 
   async loadData() {
     try {
-      const response = await fetch("/hooks-report.json");
+      const response = await fetch("./hooks-report.json");
       this.data = await response.json();
       this.filteredHooks = [...this.data.hooks];
       this.findMostRecentVersion();
