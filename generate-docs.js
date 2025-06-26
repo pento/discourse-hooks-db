@@ -292,6 +292,112 @@ Please provide a brief, technical description of what this hook does and when it
     return typeDescriptions[hook.type] || `${hook.type.replace("_", " ")} hook`;
   }
 
+  generateSinceEntries(hook) {
+    const entries = [`  @since ${hook.firstVersion}`];
+
+    if (!hook.argumentHistory || hook.argumentHistory.length <= 1) {
+      return entries;
+    }
+
+    // Sort argument history by version
+    const sortedHistory = hook.argumentHistory
+      .slice()
+      .sort((a, b) =>
+        this.compareVersions(a.firstSeenVersion, b.firstSeenVersion)
+      );
+
+    // Track argument changes between versions
+    let previousArgs = new Set();
+
+    for (const historyEntry of sortedHistory) {
+      const currentArgs = new Set(historyEntry.argumentSignature || []);
+
+      if (historyEntry.firstSeenVersion !== hook.firstVersion) {
+        // Find added arguments
+        const addedArgs = [];
+        for (const arg of currentArgs) {
+          if (!previousArgs.has(arg)) {
+            addedArgs.push(arg);
+          }
+        }
+
+        // Find removed arguments
+        const removedArgs = [];
+        for (const arg of previousArgs) {
+          if (!currentArgs.has(arg)) {
+            removedArgs.push(arg);
+          }
+        }
+
+        // Generate descriptions for changes
+        const changes = [];
+
+        if (addedArgs.length > 0) {
+          const addedDescription =
+            addedArgs.length === 1
+              ? `${addedArgs[0]} argument added`
+              : `${addedArgs.join(", ")} arguments added`;
+          changes.push(addedDescription);
+        }
+
+        if (removedArgs.length > 0) {
+          const removedDescription =
+            removedArgs.length === 1
+              ? `${removedArgs[0]} argument removed`
+              : `${removedArgs.join(", ")} arguments removed`;
+          changes.push(removedDescription);
+        }
+
+        // Check for potential renames (same count, different args)
+        if (
+          addedArgs.length === 1 &&
+          removedArgs.length === 1 &&
+          currentArgs.size === previousArgs.size
+        ) {
+          // This looks like a rename rather than separate add/remove
+          changes.length = 0; // Clear the add/remove descriptions
+          changes.push(`${removedArgs[0]} argument renamed to ${addedArgs[0]}`);
+        }
+
+        if (changes.length > 0) {
+          entries.push(
+            `  @since ${historyEntry.firstSeenVersion} ${changes.join(", ")}.`
+          );
+        }
+      }
+
+      // Update previous args for next iteration
+      previousArgs = new Set(currentArgs);
+    }
+
+    return entries;
+  }
+
+  compareVersions(a, b) {
+    // Handle "main" as the latest version
+    if (a === "main" && b === "main") {
+      return 0;
+    }
+    if (a === "main") {
+      return 1;
+    }
+    if (b === "main") {
+      return -1;
+    }
+
+    const parseVersion = (v) => v.replace("v", "").split(".").map(Number);
+    const [aMajor, aMinor, aPatch] = parseVersion(a);
+    const [bMajor, bMinor, bPatch] = parseVersion(b);
+
+    if (aMajor !== bMajor) {
+      return aMajor - bMajor;
+    }
+    if (aMinor !== bMinor) {
+      return aMinor - bMinor;
+    }
+    return aPatch - bPatch;
+  }
+
   generateDocComment(hook, description, location) {
     switch (hook.type) {
       case "plugin_outlet":
@@ -324,6 +430,9 @@ Please provide a brief, technical description of what this hook does and when it
       args = bestArgHistory.argumentSignature || [];
     }
 
+    // Generate @since entries for argument changes
+    const sinceEntries = this.generateSinceEntries(hook);
+
     const argsList =
       args.length > 0
         ? args.map((arg) => `  @param {*} ${arg} - ${arg} data`).join("\n")
@@ -333,7 +442,7 @@ Please provide a brief, technical description of what this hook does and when it
       "{{!",
       `  @pluginOutlet ${hook.name}`,
       `  @description ${description}`,
-      `  @since ${hook.firstVersion}`,
+      ...sinceEntries,
       argsList,
       "}}",
     ];
@@ -348,11 +457,16 @@ Please provide a brief, technical description of what this hook does and when it
             .join("\n")
         : " * @param {*} value - The value to transform";
 
+    // Generate @since entries for argument changes
+    const sinceEntries = this.generateSinceEntries(hook).map(
+      (entry) => ` * ${entry.replace(/^\s+/, "")}`
+    );
+
     return [
       "/**",
       ` * ${description}`,
       " *",
-      ` * @since ${hook.firstVersion}`,
+      ...sinceEntries,
       " *",
       params,
       ` * @returns {*} Transformed value`,
@@ -367,13 +481,19 @@ Please provide a brief, technical description of what this hook does and when it
         ? args.map((arg) => ` * @param {*} ${arg} - ${arg} data`).join("\n")
         : " * @param No parameters";
 
+    // Generate @since entries for argument changes
+    const sinceEntries = this.generateSinceEntries(hook).map(
+      (entry) => ` * ${entry.replace(/^\s+/, "")}`
+    );
+
     return [
       "/**",
       ` * ${description}`,
       " *",
       " * @event",
+      ...sinceEntries,
+      " *",
       params,
-      ` * @since ${hook.firstVersion}`,
       " */",
     ];
   }
