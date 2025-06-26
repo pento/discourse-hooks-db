@@ -41,6 +41,13 @@ header h1 {
   opacity: 0.9;
 }
 
+.last-updated {
+  font-size: 0.9rem;
+  opacity: 0.8;
+  margin-top: 10px;
+  font-style: italic;
+}
+
 /* Stats Grid */
 .stats-grid {
   display: grid;

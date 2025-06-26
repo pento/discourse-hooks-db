@@ -156,6 +156,20 @@ class DiscourseHooksViewer {
     document.getElementById("uniqueTypes").textContent = Object.keys(
       this.data.hooksByType
     ).length;
+
+    // Display last updated timestamp
+    if (this.data.lastUpdated) {
+      const lastUpdated = new Date(this.data.lastUpdated);
+      const formattedDate = lastUpdated.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZoneName: 'short'
+      });
+      document.getElementById("lastUpdated").textContent = `Last updated: ${formattedDate}`;
+    }
   }
 
   populateFilters() {

@@ -997,6 +997,7 @@ class DiscourseHooksDB {
       hooksInLatestVersion: hooksInLatestVersion.length,
       latestVersionHooksByType,
       retiredHooks: retiredHooks.length,
+      lastUpdated: new Date().toISOString(),
       hooks,
       summary: {
         totalArgumentChanges: hooksInLatestVersion.reduce(
