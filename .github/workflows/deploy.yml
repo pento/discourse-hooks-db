@@ -23,11 +23,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Get Discourse main branch commit
+        id: discourse-commit
+        run: |
+          COMMIT=$(git ls-remote https://github.com/discourse/discourse.git refs/heads/main | cut -f1)
+          echo "commit=$COMMIT" >> $GITHUB_OUTPUT
+
       - name: Cache Discourse bare repository
         uses: actions/cache@v4
         with:
           path: discourse/
-          key: discourse
+          key: discourse-${{ steps.discourse-commit.outputs.commit }}
+          restore-keys: |
+            discourse-
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
