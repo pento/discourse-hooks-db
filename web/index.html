@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Discourse Hooks Database</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>Discourse Hooks Database</h1>
+        <p class="subtitle">
+          Track plugin hooks and their evolution across Discourse versions
+        </p>
+      </header>
+
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+          <div class="stat-number" id="latestVersionHooks">-</div>
+          <div class="stat-label">Current Hooks</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="retiredHooks">-</div>
+          <div class="stat-label">Retired Hooks</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="hooksWithChanges">-</div>
+          <div class="stat-label">Hooks with Changes</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="totalChanges">-</div>
+          <div class="stat-label">Total Changes</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="uniqueTypes">-</div>
+          <div class="stat-label">Hook Types</div>
+        </div>
+      </div>
+
+      <div class="filters">
+        <div class="filter-group">
+          <label for="searchInput">Search hooks:</label>
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="Search by name, type, or file..."
+          />
+        </div>
+
+        <div class="filter-group">
+          <label for="typeFilter">Filter by type:</label>
+          <select id="typeFilter">
+            <option value="">All types</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="introducedVersionFilter">Introduced in version:</label>
+          <select id="introducedVersionFilter">
+            <option value="">All versions</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="changesFilter">Show only hooks with changes:</label>
+          <input type="checkbox" id="changesFilter" />
+        </div>
+
+        <div class="filter-group">
+          <label for="currentVersionFilter"
+            >Show only current version hooks:</label
+          >
+          <input type="checkbox" id="currentVersionFilter" />
+        </div>
+
+        <div class="filter-group">
+          <button id="resetFilters" class="btn-secondary">Reset Filters</button>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <h2>Hooks Growth Over Time</h2>
+        <canvas id="hooksChart"></canvas>
+      </div>
+
+      <div class="hooks-container">
+        <div class="hooks-header">
+          <h2>Hooks</h2>
+          <div class="sort-controls">
+            <label for="sortBy">Sort by:</label>
+            <select id="sortBy">
+              <option value="name">Name</option>
+              <option value="type">Type</option>
+              <option value="firstVersion">First Version</option>
+              <option value="changes">Changes</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="hooksGrid" class="hooks-grid">
+          <div class="loading">Loading hooks data...</div>
+        </div>
+      </div>
+
+      <div id="hookModal" class="modal">
+        <div class="modal-content">
+          <span class="close">&times;</span>
+          <div id="modalBody"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

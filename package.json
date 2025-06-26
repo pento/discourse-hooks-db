@@ -1,0 +1,32 @@
+{
+  "name": "discourse-hooks-db",
+  "version": "1.0.0",
+  "description": "Analyzes Discourse plugin hooks across versions",
+  "main": "index.js",
+  "bin": {
+    "discourse-hooks-db": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "analyze": "node index.js",
+    "web": "node server.js",
+    "dev": "node server.js 3000",
+    "generate-docs": "node generate-docs.js",
+    "build": "node index.js && cp hooks-report.json web/",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "prettier": "prettier --check .",
+    "prettier:fix": "prettier --write .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "GPL-3.0-or-later",
+  "packageManager": "pnpm@10.8.0",
+  "devDependencies": {
+    "@discourse/lint-configs": "^2.27.0",
+    "eslint": "^9.29.0",
+    "prettier": "^3.6.0",
+    "prettier-plugin-ember-template-tag": "^2.0.6"
+  }
+}
