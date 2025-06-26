@@ -2,7 +2,7 @@
 node_modules/
 
 # Downloaded Discourse versions
-discourse-versions/
+discourse/
 
 # Generated reports
 hooks-report.json

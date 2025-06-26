@@ -14,13 +14,20 @@ const os = require("os");
 class DiscourseHooksDB {
   constructor() {
     this.hooksDb = new Map();
-    this.workDir = path.join(__dirname, "discourse-versions");
+    this.workDir = path.join(__dirname, "discourse");
   }
 
   async run() {
+    this.totalStartTime = Date.now();
     console.log("Discourse Hooks DB - Starting analysis...");
 
+    this.setupStartTime = Date.now();
     await this.setupWorkDirectory();
+    this.setupEndTime = Date.now();
+    console.log(
+      `Git setup completed in ${((this.setupEndTime - this.setupStartTime) / 1000).toFixed(2)}s`
+    );
+
     const versions = await this.getDiscourseVersions();
 
     if (versions.length === 0) {
@@ -34,7 +41,12 @@ class DiscourseHooksDB {
       `Using ${maxWorkers} worker threads for ${versions.length} versions`
     );
 
+    this.analysisStartTime = Date.now();
     const results = await this.processVersionsInParallel(versions, maxWorkers);
+    this.analysisEndTime = Date.now();
+    console.log(
+      `Version analysis completed in ${((this.analysisEndTime - this.analysisStartTime) / 1000).toFixed(2)}s`
+    );
 
     // Merge all results
     results.forEach((hooks) => {
@@ -131,10 +143,20 @@ class DiscourseHooksDB {
 
         workers.push(worker);
 
-        worker.on("message", (hooks) => {
-          results.push(hooks);
-          completed++;
-          console.log(`Completed ${version} (${completed}/${versions.length})`);
+        worker.on("message", (data) => {
+          // Handle new message format with timing data
+          if (data.hooks && data.timing) {
+            results.push(data.hooks);
+            completed++;
+            const { version: completedVersion, totalTime, gitTime, analysisTime } = data.timing;
+            console.log(`Completed ${completedVersion} (${completed}/${versions.length})`);
+            console.log(`  Time: ${totalTime.toFixed(2)}s (git: ${gitTime.toFixed(2)}s, analysis: ${analysisTime.toFixed(2)}s)`);
+          } else {
+            // Handle old message format (just hooks array) for error cases
+            results.push(data);
+            completed++;
+            console.log(`Completed ${version} (${completed}/${versions.length})`);
+          }
 
           worker.terminate();
           workers.splice(workers.indexOf(worker), 1);
@@ -170,6 +192,31 @@ class DiscourseHooksDB {
   async setupWorkDirectory() {
     if (!fs.existsSync(this.workDir)) {
       fs.mkdirSync(this.workDir, { recursive: true });
+    }
+
+    // Set up main repository for efficient version access
+    const mainRepoDir = path.join(this.workDir, ".discourse-main-repo");
+    if (!fs.existsSync(mainRepoDir)) {
+      console.log("Cloning main Discourse repository...");
+      const cloneStartTime = Date.now();
+      execSync(
+        `git clone --bare https://github.com/discourse/discourse.git ${mainRepoDir}`,
+        { stdio: "inherit" }
+      );
+      const cloneEndTime = Date.now();
+      console.log(
+        `Repository cloned in ${((cloneEndTime - cloneStartTime) / 1000).toFixed(2)}s`
+      );
+    } else {
+      console.log("Updating main Discourse repository...");
+      const fetchStartTime = Date.now();
+      execSync(`cd ${mainRepoDir} && git fetch --all --tags`, {
+        stdio: "pipe",
+      });
+      const fetchEndTime = Date.now();
+      console.log(
+        `Repository updated in ${((fetchEndTime - fetchStartTime) / 1000).toFixed(2)}s`
+      );
     }
   }
 
@@ -1071,6 +1118,24 @@ class DiscourseHooksDB {
     }
 
     console.log(`\nDetailed report saved to: ${reportPath}`);
+
+    const totalEndTime = Date.now();
+    const totalTime = (totalEndTime - this.totalStartTime) / 1000;
+    const setupTime = (this.setupEndTime - this.setupStartTime) / 1000;
+    const analysisTime = (this.analysisEndTime - this.analysisStartTime) / 1000;
+    const reportTime = totalTime - setupTime - analysisTime;
+
+    console.log(`\n=== Performance Summary ===`);
+    console.log(`Total runtime: ${totalTime.toFixed(2)}s`);
+    console.log(
+      `  Git setup: ${setupTime.toFixed(2)}s (${((setupTime / totalTime) * 100).toFixed(1)}%)`
+    );
+    console.log(
+      `  Version analysis: ${analysisTime.toFixed(2)}s (${((analysisTime / totalTime) * 100).toFixed(1)}%)`
+    );
+    console.log(
+      `  Report generation: ${reportTime.toFixed(2)}s (${((reportTime / totalTime) * 100).toFixed(1)}%)`
+    );
   }
 }
 
@@ -1080,34 +1145,48 @@ if (!isMainThread) {
 
   async function processVersion() {
     try {
+      const workerStartTime = Date.now();
       console.log(`Worker processing ${version}...`);
 
-      // Download version
+      // Set up version directory using git worktree
       const versionDir = path.join(workDir, version);
+      const mainRepoDir = path.join(workDir, ".discourse-main-repo");
 
-      if (version === "main") {
-        // For main branch, always pull fresh changes
-        if (fs.existsSync(versionDir)) {
-          // Update existing main branch
-          execSync(`cd ${versionDir} && git pull origin main`, {
-            stdio: "pipe",
-          });
-        } else {
-          // Clone main branch
-          execSync(
-            `git clone --depth 1 --branch ${version} https://github.com/discourse/discourse.git ${versionDir}`,
-            { stdio: "pipe" }
-          );
+      const gitStartTime = Date.now();
+      if (!fs.existsSync(versionDir)) {
+        // Create directory and extract only the directories we need
+        fs.mkdirSync(versionDir, { recursive: true });
+
+        // Extract only key directories that contain hooks
+        const dirsToExtract = ["app", "lib", "plugins", "assets/javascripts"];
+        for (const dir of dirsToExtract) {
+          try {
+            execSync(
+              `git --git-dir=${mainRepoDir} archive ${version} ${dir} | tar -x -C ${versionDir} 2>/dev/null || true`,
+              { stdio: "pipe" }
+            );
+          } catch {
+            // Directory might not exist in this version, continue
+          }
         }
-      } else {
-        // For tagged versions, only clone if not exists
-        if (!fs.existsSync(versionDir)) {
-          execSync(
-            `git clone --depth 1 --branch ${version} https://github.com/discourse/discourse.git ${versionDir}`,
-            { stdio: "pipe" }
-          );
+      } else if (version === "main") {
+        // For main branch, re-extract to get latest changes
+        execSync(`rm -rf ${versionDir}`, { stdio: "pipe" });
+        fs.mkdirSync(versionDir, { recursive: true });
+
+        const dirsToExtract = ["app", "lib", "plugins", "assets/javascripts"];
+        for (const dir of dirsToExtract) {
+          try {
+            execSync(
+              `git --git-dir=${mainRepoDir} archive ${version} ${dir} | tar -x -C ${versionDir} 2>/dev/null || true`,
+              { stdio: "pipe" }
+            );
+          } catch {
+            // Directory might not exist in this version, continue
+          }
         }
       }
+      const gitEndTime = Date.now();
 
       // Analyze hooks
       const analyzer = new DiscourseHooksDB();
@@ -1141,7 +1220,22 @@ if (!isMainThread) {
       });
 
       const hooks = Array.from(hookMap.values());
-      parentPort.postMessage(hooks);
+
+      const workerEndTime = Date.now();
+      const totalWorkerTime = (workerEndTime - workerStartTime) / 1000;
+      const gitTime = (gitEndTime - gitStartTime) / 1000;
+      const analysisTime = totalWorkerTime - gitTime;
+
+      // Send timing data back to main thread for consistent logging
+      parentPort.postMessage({
+        hooks,
+        timing: {
+          version,
+          totalTime: totalWorkerTime,
+          gitTime,
+          analysisTime
+        }
+      });
     } catch (error) {
       console.error(`Error processing ${version}:`, error.message);
       parentPort.postMessage([]);
