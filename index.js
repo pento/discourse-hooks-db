@@ -148,14 +148,20 @@ class DiscourseHooksDB {
           if (data.hooks && data.timing) {
             results.push(data.hooks);
             completed++;
-            const { version: completedVersion, totalTime, gitTime, analysisTime } = data.timing;
-            console.log(`Completed ${completedVersion} (${completed}/${versions.length})`);
-            console.log(`  Time: ${totalTime.toFixed(2)}s (git: ${gitTime.toFixed(2)}s, analysis: ${analysisTime.toFixed(2)}s)`);
+            const {
+              version: completedVersion,
+              totalTime,
+              gitTime,
+              analysisTime,
+            } = data.timing;
+            console.log(
+              `Completed ${completedVersion} (${completed}/${versions.length})`
+            );
+            console.log(
+              `  Time: ${totalTime.toFixed(2)}s (git: ${gitTime.toFixed(2)}s, analysis: ${analysisTime.toFixed(2)}s)`
+            );
           } else {
-            // Handle old message format (just hooks array) for error cases
-            results.push(data);
-            completed++;
-            console.log(`Completed ${version} (${completed}/${versions.length})`);
+            console.log(data);
           }
 
           worker.terminate();
@@ -852,13 +858,8 @@ class DiscourseHooksDB {
   parsePluginOutletArgs(componentString) {
     // Extract @outletArgs content to get the actual outlet arguments (newer versions)
     let outletArgsMatch = componentString.match(
-      /@outletArgs\s*=\s*{{([^}]+)}}/s
+      /@(?:outletArgs|args)\s*=\s*{{([^}]+)}}/s
     );
-
-    // If @outletArgs not found, try @args (older versions)
-    if (!outletArgsMatch) {
-      outletArgsMatch = componentString.match(/@args\s*=\s*{{([^}]+)}}/s);
-    }
 
     if (!outletArgsMatch) {
       return []; // No outlet args found
@@ -867,7 +868,7 @@ class DiscourseHooksDB {
     const outletArgsContent = outletArgsMatch[1];
 
     // Handle different hash patterns: hash, lazyHash, etc.
-    const hashMatch = outletArgsContent.match(/(?:lazy)?hash\s+([^}]+)/s);
+    const hashMatch = outletArgsContent.match(/(?:lazy)?hash\s+([^}]+)/is);
     if (hashMatch) {
       const hashContent = hashMatch[1];
       // Extract argument names from key=value pairs
@@ -883,24 +884,6 @@ class DiscourseHooksDB {
     }
 
     return [];
-  }
-
-  parseComponentAttributes(componentString) {
-    const attrs = [];
-    // Match @attribute="value" or @attribute={{value}}
-    const attrRegex = /@(\w+)\s*=\s*(?:['"]([^'"]*?)['"]|{{([^}]*?)}})/g;
-    let match;
-
-    while ((match = attrRegex.exec(componentString)) !== null) {
-      if (match[1] !== "name") {
-        // Skip the name attribute as it's already captured
-        const attrValue = match[2] || `{{${match[3]}}}`;
-        const normalizedAttr = `@${match[1]}=${this.normalizeArgument(attrValue)}`;
-        attrs.push(normalizedAttr);
-      }
-    }
-
-    return attrs;
   }
 
   parsePluginOutletHelperArgs(helperString) {
@@ -931,24 +914,6 @@ class DiscourseHooksDB {
     }
 
     return [];
-  }
-
-  parseHelperArguments(helperString) {
-    const args = [];
-    // Match key=value pairs in handlebars helpers
-    const argRegex = /(\w+)\s*=\s*(?:['"]([^'"]*?)['"]|([^'\s}]+))/g;
-    let match;
-
-    while ((match = argRegex.exec(helperString)) !== null) {
-      if (match[1] !== "name") {
-        // Skip the name attribute as it's already captured
-        const argValue = match[2] || match[3];
-        const normalizedArg = `${match[1]}=${this.normalizeArgument(argValue)}`;
-        args.push(normalizedArg);
-      }
-    }
-
-    return args;
   }
 
   shouldAnalyzeFile(filePath) {
@@ -1153,27 +1118,17 @@ if (!isMainThread) {
       const mainRepoDir = path.join(workDir, ".discourse-main-repo");
 
       const gitStartTime = Date.now();
+
+      if (version === "main") {
+        // For main branch, re-extract to get latest changes
+        execSync(`rm -rf ${versionDir}`, { stdio: "pipe" });
+      }
+
       if (!fs.existsSync(versionDir)) {
         // Create directory and extract only the directories we need
         fs.mkdirSync(versionDir, { recursive: true });
 
         // Extract only key directories that contain hooks
-        const dirsToExtract = ["app", "lib", "plugins", "assets/javascripts"];
-        for (const dir of dirsToExtract) {
-          try {
-            execSync(
-              `git --git-dir=${mainRepoDir} archive ${version} ${dir} | tar -x -C ${versionDir} 2>/dev/null || true`,
-              { stdio: "pipe" }
-            );
-          } catch {
-            // Directory might not exist in this version, continue
-          }
-        }
-      } else if (version === "main") {
-        // For main branch, re-extract to get latest changes
-        execSync(`rm -rf ${versionDir}`, { stdio: "pipe" });
-        fs.mkdirSync(versionDir, { recursive: true });
-
         const dirsToExtract = ["app", "lib", "plugins", "assets/javascripts"];
         for (const dir of dirsToExtract) {
           try {
@@ -1233,8 +1188,8 @@ if (!isMainThread) {
           version,
           totalTime: totalWorkerTime,
           gitTime,
-          analysisTime
-        }
+          analysisTime,
+        },
       });
     } catch (error) {
       console.error(`Error processing ${version}:`, error.message);

@@ -6,7 +6,7 @@ const { execSync } = require("child_process");
 
 class HookDocumentationGenerator {
   constructor() {
-    this.workDir = path.join(__dirname, "discourse-versions");
+    this.workDir = path.join(__dirname, "discourse");
     this.masterDir = path.join(this.workDir, "main");
     this.reportPath = path.join(__dirname, "hooks-report.json");
     this.hooksData = null;
