@@ -3,6 +3,8 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: ["main"]
+  schedule:
+    - cron: "0 0 * * *"  # Run daily at midnight UTC
   workflow_dispatch:
 
 permissions:
@@ -20,6 +22,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Cache Discourse versions
+        uses: actions/cache@v4
+        with:
+          path: discourse-versions
+          key: discourse-versions-${{ github.run_id }}
+          restore-keys: |
+            discourse-versions-
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
