@@ -20,8 +20,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Check Free Space
+        run: |
+          echo "Free space:"
+          df -h
 
       - name: Free Disk Space
         uses: easimon/maximize-build-space@master
@@ -31,6 +33,9 @@ jobs:
           remove-haskell: "true"
           remove-codeql: "true"
           remove-docker-images: "true"
+
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Check Free Space
         run: |
@@ -44,6 +49,11 @@ jobs:
           key: discourse-versions-${{ github.run_id }}
           restore-keys: |
             discourse-versions-
+
+      - name: Check Free Space
+        run: |
+          echo "Free space:"
+          df -h
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -61,6 +71,11 @@ jobs:
 
       - name: Generate hooks analysis
         run: pnpm run build
+
+      - name: Check Free Space
+        run: |
+          echo "Free space:"
+          df -h
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
