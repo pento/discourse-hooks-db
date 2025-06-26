@@ -106,7 +106,7 @@ class DiscourseHooksDB {
         }
 
         // For now, just track raw arguments - we'll consolidate later
-        const argKey = JSON.stringify(hook.arguments || []);
+        const argKey = this.createArgumentKey(hook.arguments || []);
         if (!hookData.argumentHistory.has(argKey)) {
           hookData.argumentHistory.set(argKey, {
             arguments: hook.arguments || [],
@@ -275,6 +275,23 @@ class DiscourseHooksDB {
     return aPatch - bPatch;
   }
 
+  createArgumentKey(args) {
+    // Create a case-insensitive key for argument comparison
+    // Convert all arguments to lowercase for comparison while preserving structure
+    if (!args || args.length === 0) {
+      return "[]";
+    }
+    
+    const normalizedArgs = args.map(arg => {
+      if (typeof arg === 'string') {
+        return arg.toLowerCase();
+      }
+      return arg;
+    });
+    
+    return JSON.stringify(normalizedArgs);
+  }
+
   consolidateArgumentHistory() {
     // Post-process argument history for value transformers and app events
     this.hooksDb.forEach((hookData) => {
@@ -300,7 +317,7 @@ class DiscourseHooksDB {
           hookData,
           version
         );
-        const argKey = JSON.stringify(consolidatedArgs);
+        const argKey = this.createArgumentKey(consolidatedArgs);
 
         if (!consolidatedHistory.has(argKey)) {
           consolidatedHistory.set(argKey, {
